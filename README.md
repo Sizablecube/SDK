@@ -1,60 +1,182 @@
-# journal-sdk
+# @sizablecube/sdk
 
-Shared TypeScript SDK for the Journal app's backends: typed API client + React Query hooks, one package instead of duplicated Axios/type code per frontend.
+A shared TypeScript SDK: typed API client + React Query hooks, packaged once
+instead of duplicated Axios calls and DTOs across every frontend.
 
-No universal gateway — each backend (Auth, Journal, ...) keeps its own proxy. The SDK handles that by holding one axios instance *per domain* rather than one shared client; you point each at wherever that backend's proxy lives.
+The SDK is **universal** — it doesn't assume any single backend. Each API
+domain (Auth, Journal, and whatever comes next) gets its own axios instance
+and its own service + hooks layer inside the SDK. Frontends consume hooks
+like `useTasks()` or `useFolders()` and never talk to Axios directly.
 
-## What's in here so far
+This package will grow over time as more domains and backends are added.
+The publishing contract stays the same: build to `dist/`, ship types, ship
+hooks, ship nothing else.
 
-Two domains, built as the reference pattern for the rest:
+---
 
-- **Auth** — register/login/logout, forgot/reset/change password, profile — matching `AuthController.cs` action-for-action, including the 423-lockout case (`ApiError.isLockedOut` / `.retryAfterSeconds`).
-- **Folders** — full CRUD, built via the generic `createCrudResource` + `createCrudHooks` factories. This is the domain to copy for Tags, EntryTypes, TaskStatuses, TaskPriorities — anything that's plain list/get/create/update/delete.
+## Architecture at a glance
 
-Not yet added: Entries, Tasks, Recurrence, Dashboard. Entries/Tasks need the factory-plus-extra-methods pattern (see the comment in `createCrudResource.ts`) since they have endpoints beyond plain CRUD (`/gantt`, `/status`, occurrence actions).
+- **No universal gateway.** Each backend keeps its own proxy.
+- The SDK handles that by holding **one axios instance per domain**, not one
+  shared client. You point each instance at wherever that backend's proxy
+  lives via `configureSdk({...})`.
+- **React Query is a peer dependency.** The consuming app owns the
+  `QueryClient`; the SDK just registers queries and mutations against it.
+- **Types ship with the package.** Frontend developers get IntelliSense on
+  every request/response DTO without maintaining a copy.
 
-## Using it today (before it's published)
+---
 
-This isn't on npm yet. Until it is, either:
+## What's in here today
 
-- **npm/yarn/pnpm workspaces** (if the frontend and this package end up in the same repo): add `"journal-sdk": "workspace:*"` to the frontend's `package.json`.
-- **`npm link`**: `npm link` here, then `npm link journal-sdk` in the frontend.
-- **Local path install**: `npm install file:../path/to/journal-sdk` from the frontend.
+Two domains implemented, and both are the reference patterns for the rest:
 
-All three work identically to a real npm install from the frontend's code — `import { useFolders } from "journal-sdk"` either way. Nothing about the source changes when you actually publish; only the install command does.
+| Domain | Status | Pattern |
+|---|---|---|
+| **Auth** | ✅ | Hand-written service + hooks. Covers register / login / logout, forgot / reset / change password, and profile. Matches `AuthController.cs` action-for-action, including the `423 Locked` lockout case (`ApiError.isLockedOut` / `.retryAfterSeconds`). |
+| **Folders** | ✅ | Built via the generic `createCrudResource` + `createCrudHooks` factories. This is the template for anything that's plain `list / get / create / update / delete`. |
 
-## Publishing later
+**Not yet added:** Entries, Tasks, Recurrence, Dashboard.
 
-1. Pick a real package name — `journal-sdk` is a placeholder. A scoped name (`@your-npm-username/journal-sdk`) avoids collisions on the public registry, or point `publishConfig.registry` at a private registry if you'd rather not publish publicly.
-2. `npm run build` (tsup outputs `dist/` — CJS, ESM, and `.d.ts` — that's what actually ships; `src/` isn't published).
-3. `npm publish` (bump `version` first, or use `npm version patch/minor/major`).
+Entries and Tasks will need the *factory-plus-extra-methods* pattern — they
+have endpoints beyond plain CRUD (`/gantt`, `/status`, occurrence actions).
+See the comment at the top of `createCrudResource.ts` for the shape.
 
-## Setup
+---
+
+## Using it today (before it's on npm)
+
+Until the package is published, pick whichever install path matches your setup:
+
+- **Workspaces** (frontend + SDK live in one repo):
+  ```jsonc
+  // frontend/package.json
+  {
+    "dependencies": {
+      "@sizablecube/sdk": "workspace:*"
+    }
+  }
+  ```
+
+- **`npm link`** (SDK and frontend live in separate repos):
+  ```bash
+  # in the SDK repo
+  npm link
+
+  # in the frontend repo
+  npm link @sizablecube/sdk
+  ```
+
+- **Local path install** (quick and dirty, no linking):
+  ```bash
+  npm install file:../path/to/sdk
+  ```
+
+All three behave identically to a real `npm install @sizablecube/sdk` from
+the frontend's perspective — `import { useFolders } from "@sizablecube/sdk"`
+works the same either way. Publishing later changes only *how the package is
+fetched*, not the code that imports it.
+
+---
+
+## Setup (consumer side)
 
 ```ts
-import { configureSdk } from "journal-sdk";
+import { configureSdk } from "@sizablecube/sdk";
 
 configureSdk({
-  authBaseUrl: process.env.NEXT_PUBLIC_AUTH_API_URL,
+  authBaseUrl:    process.env.NEXT_PUBLIC_AUTH_API_URL,
   journalBaseUrl: process.env.NEXT_PUBLIC_JOURNAL_API_URL,
 });
 ```
 
-Call this once, before any hook fires its first request — e.g. at the top of the root layout/provider, alongside where `QueryClientProvider` is already set up. Both React Query and this SDK need the app to already be wrapped in a `QueryClientProvider` — the SDK doesn't create its own.
+Call `configureSdk(...)` **once**, before any hook fires its first request —
+e.g. at the top of your root layout or provider, alongside where you already
+set up `QueryClientProvider`.
 
-## Adding the next domain (e.g. Tags)
+The SDK does **not** create its own `QueryClient`. Both React Query and this
+SDK expect the app to already be wrapped in `<QueryClientProvider>`.
+
+### Adding a new backend later
+
+Because each domain has its own base URL, adding a third backend is just a
+new key in the config:
+
+```ts
+configureSdk({
+  authBaseUrl:     process.env.NEXT_PUBLIC_AUTH_API_URL,
+  journalBaseUrl:  process.env.NEXT_PUBLIC_JOURNAL_API_URL,
+  analyticsBaseUrl: process.env.NEXT_PUBLIC_ANALYTICS_API_URL, // future
+});
+```
+
+The SDK's internals don't care how many backends exist — each domain
+service is bound to exactly one axios instance.
+
+---
+
+## Adding a new domain (e.g. Tags)
+
+The whole domain is three small files:
 
 ```ts
 // src/types/tag.ts — same shape as folder.ts
+export interface Tag { id: string; name: string; }
+export interface CreateTagRequest { name: string; }
+export interface UpdateTagRequest { name: string; }
+```
+
+```ts
 // src/services/tag.service.ts
 import { journalClient } from "../client/httpClient";
 import { createCrudResource } from "../client/createCrudResource";
-export const tagService = createCrudResource<Tag, CreateTagRequest, UpdateTagRequest>(journalClient, "/api/Tags");
+import type { Tag, CreateTagRequest, UpdateTagRequest } from "../types/tag";
 
-// src/hooks/useTags.ts
-import { createCrudHooks } from "../client/createCrudHooks";
-export const { useList: useTags, useOne: useTag, useCreate: useCreateTag, useUpdate: useUpdateTag, useDelete: useDeleteTag } =
-  createCrudHooks("tags", tagService);
+export const tagService = createCrudResource<Tag, CreateTagRequest, UpdateTagRequest>(
+  journalClient,
+  "/api/Tags"
+);
 ```
 
-Then export the new pieces from `src/index.ts`. That's the whole domain.
+```ts
+// src/hooks/useTags.ts
+import { createCrudHooks } from "../client/createCrudHooks";
+import { tagService } from "../services/tag.service";
+
+export const {
+  useList:   useTags,
+  useOne:    useTag,
+  useCreate: useCreateTag,
+  useUpdate: useUpdateTag,
+  useDelete: useDeleteTag,
+} = createCrudHooks("tags", tagService);
+```
+
+Then re-export from `src/index.ts`. Done — the frontend now has
+`useTags()`, `useCreateTag()`, and so on, with full typing and cache
+invalidation handled by the factory.
+
+---
+
+## Publishing
+
+```bash
+# 1. Bump the version
+npm version patch   # or minor / major
+
+# 2. Build + verify
+npm run build
+npm pack --dry-run  # should list only dist/, README.md, LICENSE, package.json
+
+# 3. Publish
+npm publish --access public
+```
+
+Only `dist/` ships — `src/` stays in the repo. The `files` field in
+`package.json` is the safety gate.
+
+---
+
+## License
+
+MIT — see `LICENSE`.
