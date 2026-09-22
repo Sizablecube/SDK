@@ -6,11 +6,20 @@
   "author": "Vhutali",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Vhutali/journal-sdk.git"
+    "url": "git+https://github.com/Sizablecube/SDK.git"
   },
-  "homepage": "https://github.com/Vhutali/journal-sdk#readme",
-  "bugs": { "url": "https://github.com/Vhutali/journal-sdk/issues" },
-  "keywords": ["journal", "sdk", "react-query", "axios", "typescript", "api-client"],
+  "homepage": "https://github.com/Sizablecube/SDK#readme",
+  "bugs": {
+    "url": "https://github.com/Sizablecube/SDK/issues"
+  },
+  "keywords": [
+    "journal",
+    "sdk",
+    "react-query",
+    "axios",
+    "typescript",
+    "api-client"
+  ],
 
   "main": "dist/index.js",
   "module": "dist/index.mjs",
