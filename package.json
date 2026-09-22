@@ -1,0 +1,51 @@
+{
+  "name": "@sizablecube/sdk",
+  "version": "0.1.0",
+  "description": "Shared TypeScript SDK (typed API client + React Query hooks) for the Journal app's backends. No universal gateway — each backend keeps its own proxy; see configureSdk().",
+  "license": "MIT",
+  "author": "Vhutali",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Vhutali/journal-sdk.git"
+  },
+  "homepage": "https://github.com/Vhutali/journal-sdk#readme",
+  "bugs": { "url": "https://github.com/Vhutali/journal-sdk/issues" },
+  "keywords": ["journal", "sdk", "react-query", "axios", "typescript", "api-client"],
+
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "sideEffects": false,
+
+  "engines": { "node": ">=18" },
+
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm run build"
+  },
+
+  "peerDependencies": {
+    "@tanstack/react-query": "^5.0.0",
+    "axios": "^1.0.0",
+    "react": "^18.0.0 || ^19.0.0"
+  },
+
+  "devDependencies": {
+    "@tanstack/react-query": "^5.59.0",
+    "@types/react": "^18.3.0",
+    "axios": "^1.7.0",
+    "react": "^18.3.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0"
+  }
+}
