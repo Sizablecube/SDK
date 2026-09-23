@@ -75,3 +75,11 @@ export function useUpdateProfile() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: CURRENT_USER_KEY }),
   });
 }
+
+export function useDeleteProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => authService.deleteProfile(),
+    onSuccess: () => queryClient.clear(),
+  }); 
+}
